@@ -20,7 +20,6 @@ const deleteImageCloudinary = async (publicId) => {
 exports.createBook = async (req, res) => {
   try {
     const bookObject = JSON.parse(req.body.book);
-
     let imageUrl = "";
     let imageId = "";
 
@@ -60,7 +59,6 @@ exports.modifyBook = async (req, res) => {
       : { ...req.body };
 
     if (req.file) {
-      // Supprime l’ancienne image si elle existe
       if (book.imageId) await deleteImageCloudinary(book.imageId);
 
       const result = await cloudinary.uploader.upload(req.file.path, {
