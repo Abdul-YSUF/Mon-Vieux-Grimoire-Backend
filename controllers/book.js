@@ -8,11 +8,14 @@ const calcAverageRating = (ratings) => {
 };
 
 const deleteImage = async (imageUrl) => {
+  if (!imageUrl) return;
+  const filename = imageUrl.split("/images/")[1];
+  if (!filename) return;
+
   try {
-    const filename = imageUrl.split("/images/")[1];
     await fs.unlink(`images/${filename}`);
   } catch (err) {
-    console.error("Erreur suppression image:", err);
+    console.error("Erreur suppression image:", err.message);
   }
 };
 
@@ -27,7 +30,7 @@ exports.createBook = async (req, res) => {
     const book = new Book({
       ...bookObject,
       userId: req.auth.userId,
-      imageUrl: `${req.protocol}://${req.get("host")}/images/${req.file.filename.split(".")[0]}optimized.webp`,
+      imageUrl: `${req.protocol}://${req.get("host")}/images/${req.file.filename}`,
       averageRating: initialRating,
     });
 
@@ -43,7 +46,7 @@ exports.modifyBook = async (req, res) => {
     const bookObject = req.file
       ? {
           ...JSON.parse(req.body.book),
-          imageUrl: `${req.protocol}://${req.get("host")}/images/${req.file.filename.split(".")[0]}optimized.webp`,
+          imageUrl: `${req.protocol}://${req.get("host")}/images/${req.file.filename}`,
         }
       : { ...req.body };
     delete bookObject._userId;
