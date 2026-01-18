@@ -7,16 +7,6 @@ const calcAverageRating = (ratings) => {
   return Number((sum / ratings.length).toFixed(2));
 };
 
-const deleteImageCloudinary = async (publicId) => {
-  if (!publicId) return;
-  try {
-    await cloudinary.uploader.destroy(publicId);
-    console.log(`Image Cloudinary ${publicId} supprimée`);
-  } catch (err) {
-    console.error("Erreur suppression image Cloudinary:", err.message);
-  }
-};
-
 exports.createBook = async (req, res) => {
   try {
     const bookData = JSON.parse(req.body.book);
