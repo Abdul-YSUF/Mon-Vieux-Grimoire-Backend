@@ -1,4 +1,5 @@
 const Book = require("../models/Book");
+const { cloudinary } = require("../middleware/multerCloudinary");
 
 const calcAverageRating = (ratings) => {
   if (!ratings || ratings.length === 0) return 0;
@@ -6,21 +7,68 @@ const calcAverageRating = (ratings) => {
   return Number((sum / ratings.length).toFixed(2));
 };
 
+const deleteCloudinaryImage = async (imageUrl) => {
+  if (!imageUrl) return;
+  try {
+    const parts = imageUrl.split("/");
+    const publicIdWithExtension = parts[parts.length - 1];
+    const publicId = publicIdWithExtension.split(".")[0];
+    await cloudinary.uploader.destroy(`books/${publicId}`);
+  } catch (err) {
+    console.error("Erreur suppression image Cloudinary:", err.message);
+  }
+};
+
 exports.createBook = async (req, res) => {
   try {
     const bookObject = JSON.parse(req.body.book);
-
     const book = new Book({
       ...bookObject,
       userId: req.auth.userId,
-      imageUrl: req.file.path,
+      imageUrl: req.file?.path || "",
       averageRating: bookObject.ratings?.[0]?.grade || 0,
     });
 
     await book.save();
-    res.status(201).json({ message: "Livre enregistré !" });
+    res.status(201).json({ message: "Livre enregistré !", book });
   } catch (error) {
     res.status(400).json({ error });
+  }
+};
+
+exports.modifyBook = async (req, res) => {
+  try {
+    const book = await Book.findById(req.params.id);
+    if (!book) return res.status(404).json({ message: "Livre non trouvé" });
+    if (book.userId !== req.auth.userId)
+      return res.status(403).json({ message: "Non autorisé" });
+
+    const bookObject = req.file
+      ? { ...JSON.parse(req.body.book), imageUrl: req.file.path }
+      : { ...req.body };
+
+    if (req.file && book.imageUrl) await deleteCloudinaryImage(book.imageUrl);
+
+    await Book.updateOne({ _id: req.params.id }, bookObject);
+    res.status(200).json({ message: "Livre modifié !", book: bookObject });
+  } catch (error) {
+    res.status(400).json({ error });
+  }
+};
+
+exports.deleteBook = async (req, res) => {
+  try {
+    const book = await Book.findById(req.params.id);
+    if (!book) return res.status(404).json({ message: "Livre non trouvé" });
+    if (book.userId !== req.auth.userId)
+      return res.status(403).json({ message: "Non autorisé" });
+
+    if (book.imageUrl) await deleteCloudinaryImage(book.imageUrl);
+
+    await Book.deleteOne({ _id: req.params.id });
+    res.status(200).json({ message: "Livre supprimé !" });
+  } catch (error) {
+    res.status(500).json({ error });
   }
 };
 
@@ -54,9 +102,8 @@ exports.getAllBooks = async (req, res) => {
 
 exports.rateBook = async (req, res) => {
   try {
-    if (req.body.userId !== req.auth.userId) {
+    if (req.body.userId !== req.auth.userId)
       return res.status(401).json({ message: "Non autorisé" });
-    }
 
     const book = await Book.findById(req.params.id);
     if (!book) return res.status(404).json({ message: "Livre non trouvé" });
@@ -64,19 +111,14 @@ exports.rateBook = async (req, res) => {
     const existingRating = book.ratings.find(
       (r) => r.userId === req.auth.userId,
     );
-
     if (existingRating) {
       existingRating.grade = req.body.rating;
     } else {
-      book.ratings.push({
-        userId: req.auth.userId,
-        grade: req.body.rating,
-      });
+      book.ratings.push({ userId: req.auth.userId, grade: req.body.rating });
     }
 
     book.averageRating = calcAverageRating(book.ratings);
     await book.save();
-
     res.status(201).json(book);
   } catch (error) {
     res.status(500).json({ error });
