@@ -7,13 +7,13 @@ const calcAverageRating = (ratings) => {
   return Number((sum / ratings.length).toFixed(2));
 };
 
-const deleteCloudinaryImage = async (imageUrl) => {
+const deleteImageCloudinary = async (imageUrl) => {
   if (!imageUrl) return;
+
+  const publicId = imageUrl.split("/").pop().split(".")[0];
   try {
-    const parts = imageUrl.split("/");
-    const publicIdWithExtension = parts[parts.length - 1];
-    const publicId = publicIdWithExtension.split(".")[0];
-    await cloudinary.uploader.destroy(`books/${publicId}`);
+    await cloudinary.uploader.destroy(publicId);
+    console.log(`Image Cloudinary ${publicId} supprimée`);
   } catch (err) {
     console.error("Erreur suppression image Cloudinary:", err.message);
   }
@@ -40,17 +40,21 @@ exports.modifyBook = async (req, res) => {
   try {
     const book = await Book.findById(req.params.id);
     if (!book) return res.status(404).json({ message: "Livre non trouvé" });
-    if (book.userId !== req.auth.userId)
+
+    if (book.userId !== req.auth.userId) {
       return res.status(403).json({ message: "Non autorisé" });
+    }
 
     const bookObject = req.file
       ? { ...JSON.parse(req.body.book), imageUrl: req.file.path }
       : { ...req.body };
 
-    if (req.file && book.imageUrl) await deleteCloudinaryImage(book.imageUrl);
+    if (req.file && book.imageUrl) {
+      await deleteImageCloudinary(book.imageUrl);
+    }
 
     await Book.updateOne({ _id: req.params.id }, bookObject);
-    res.status(200).json({ message: "Livre modifié !", book: bookObject });
+    res.status(200).json({ message: "Livre modifié !" });
   } catch (error) {
     res.status(400).json({ error });
   }
@@ -60,13 +64,15 @@ exports.deleteBook = async (req, res) => {
   try {
     const book = await Book.findById(req.params.id);
     if (!book) return res.status(404).json({ message: "Livre non trouvé" });
-    if (book.userId !== req.auth.userId)
-      return res.status(403).json({ message: "Non autorisé" });
 
-    if (book.imageUrl) await deleteCloudinaryImage(book.imageUrl);
+    if (book.userId !== req.auth.userId) {
+      return res.status(403).json({ message: "Non autorisé" });
+    }
+
+    if (book.imageUrl) await deleteImageCloudinary(book.imageUrl);
 
     await Book.deleteOne({ _id: req.params.id });
-    res.status(200).json({ message: "Livre supprimé !" });
+    res.status(200).json({ message: "Livre et image supprimés !" });
   } catch (error) {
     res.status(500).json({ error });
   }
