@@ -1,33 +1,36 @@
-const multer = require("multer");
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
-const cloudinary = require("cloudinary").v2;
+const express = require("express");
+const mongoose = require("mongoose");
+const mongoSanitize = require("express-mongo-sanitize");
+const helmet = require("helmet");
+const cors = require("cors");
 require("dotenv").config();
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+const bookRoutes = require("./routes/book");
+const userRoutes = require("./routes/user");
 
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: async (req, file) => {
-    let publicId = `book_${Date.now()}`;
+const app = express();
 
-    if (req.params.id) {
-      publicId = `book_${req.params.id}`;
-    }
+mongoose.set("strictQuery", true);
+mongoose
+  .connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => console.log("Connexion à MongoDB réussie !"))
+  .catch((err) => console.log("Connexion à MongoDB échouée :", err.message));
 
-    return {
-      folder: "books",
-      public_id: publicId,
-      overwrite: true,
-      allowed_formats: ["jpg", "jpeg", "png", "webp"],
-      transformation: [{ width: 400, height: 500, crop: "fill" }],
-    };
-  },
-});
+app.use(express.json());
+app.use(mongoSanitize());
+app.use(helmet());
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    credentials: true,
+  }),
+);
 
-const upload = multer({ storage }).single("image");
+app.use("/api/books", bookRoutes);
+app.use("/api/auth", userRoutes);
 
-module.exports = { upload, cloudinary };
+module.exports = app;
