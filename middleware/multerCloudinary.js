@@ -1,6 +1,7 @@
-const { v2: cloudinary } = require("cloudinary");
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const multer = require("multer");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const cloudinary = require("cloudinary").v2;
+require("dotenv").config();
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -9,14 +10,24 @@ cloudinary.config({
 });
 
 const storage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: "books",
-    format: async () => "webp",
-    public_id: (req, file) =>
-      file.originalname.split(" ").join("_") + Date.now(),
+  cloudinary: cloudinary,
+  params: async (req, file) => {
+    let publicId = "temp_" + Date.now();
+
+    if (req.params.id) {
+      publicId = "books/book_" + req.params.id;
+    }
+
+    return {
+      folder: "books",
+      public_id: publicId,
+      overwrite: true,
+      allowed_formats: ["jpg", "jpeg", "png", "webp"],
+      transformation: [{ width: 400, height: 500, crop: "fill" }],
+    };
   },
 });
 
-module.exports = multer({ storage }).single("image");
-module.exports.cloudinary = cloudinary;
+const upload = multer({ storage: storage }).single("image");
+
+module.exports = { upload, cloudinary };

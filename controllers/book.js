@@ -20,25 +20,23 @@ const deleteImageCloudinary = async (publicId) => {
 exports.createBook = async (req, res) => {
   try {
     const bookObject = JSON.parse(req.body.book);
-    let imageUrl = "";
-    let imageId = "";
-
-    if (req.file) {
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: "books",
-        transformation: [{ width: 400, height: 500, crop: "fill" }],
-      });
-      imageUrl = result.secure_url;
-      imageId = result.public_id;
-    }
 
     const book = new Book({
       ...bookObject,
       userId: req.auth.userId,
-      imageUrl,
-      imageId,
       averageRating: bookObject.ratings?.[0]?.grade || 0,
     });
+
+    if (req.file) {
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        folder: "books",
+        public_id: `book_${book._id}`,
+        overwrite: true,
+        transformation: [{ width: 400, height: 500, crop: "fill" }],
+      });
+      book.imageUrl = result.secure_url;
+      book.imageId = result.public_id;
+    }
 
     await book.save();
     res.status(201).json({ message: "Livre enregistré !", book });
@@ -54,17 +52,18 @@ exports.modifyBook = async (req, res) => {
     if (book.userId !== req.auth.userId)
       return res.status(403).json({ message: "Non autorisé" });
 
-    const bookObject = req.file
-      ? { ...JSON.parse(req.body.book) }
-      : { ...req.body };
+    const bookObject = req.file ? JSON.parse(req.body.book) : { ...req.body };
 
     if (req.file) {
       if (book.imageId) await deleteImageCloudinary(book.imageId);
 
       const result = await cloudinary.uploader.upload(req.file.path, {
         folder: "books",
+        public_id: `book_${book._id}`,
+        overwrite: true,
         transformation: [{ width: 400, height: 500, crop: "fill" }],
       });
+
       bookObject.imageUrl = result.secure_url;
       bookObject.imageId = result.public_id;
     }
