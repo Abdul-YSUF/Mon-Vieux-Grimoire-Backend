@@ -1,14 +1,4 @@
-# Piiquante
-
-## Installation Frontend
-
-Clonez frontend fourni par OpenClassrooms:
-
-https://github.com/OpenClassrooms-Student-Center/Web-Developer-P6
-
-Puis installer `npm install` et démarrer terminal à partir de frontend avec la commande `npm start`.
-
-Puis connecter avec un navigateur à l'url: `http://localhost/4200`.
+# MON VIEUX GRIMOIRE
 
 ## Installation Backend
 
