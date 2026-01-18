@@ -24,8 +24,11 @@ exports.createBook = async (req, res) => {
     const book = new Book({
       ...bookObject,
       userId: req.auth.userId,
-      averageRating: bookObject.ratings?.[0]?.grade || 0,
+      ratings: bookObject.ratings || [],
+      averageRating: calcAverageRating(bookObject.ratings),
     });
+
+    await book.save();
 
     if (req.file) {
       const result = await cloudinary.uploader.upload(req.file.path, {
@@ -34,11 +37,12 @@ exports.createBook = async (req, res) => {
         overwrite: true,
         transformation: [{ width: 400, height: 500, crop: "fill" }],
       });
+
       book.imageUrl = result.secure_url;
       book.imageId = result.public_id;
+      await book.save();
     }
 
-    await book.save();
     res.status(201).json({ message: "Livre enregistré !", book });
   } catch (error) {
     res.status(400).json({ error });
@@ -52,10 +56,14 @@ exports.modifyBook = async (req, res) => {
     if (book.userId !== req.auth.userId)
       return res.status(403).json({ message: "Non autorisé" });
 
-    const bookObject = req.file ? JSON.parse(req.body.book) : { ...req.body };
+    const bookObject = req.file
+      ? { ...JSON.parse(req.body.book) }
+      : { ...req.body };
 
     if (req.file) {
-      if (book.imageId) await deleteImageCloudinary(book.imageId);
+      if (book.imageId) {
+        await deleteImageCloudinary(book.imageId);
+      }
 
       const result = await cloudinary.uploader.upload(req.file.path, {
         folder: "books",
@@ -82,19 +90,12 @@ exports.deleteBook = async (req, res) => {
     if (book.userId !== req.auth.userId)
       return res.status(403).json({ message: "Non autorisé" });
 
-    if (book.imageId) await deleteImageCloudinary(book.imageId);
+    if (book.imageId) {
+      await deleteImageCloudinary(book.imageId);
+    }
 
     await Book.deleteOne({ _id: req.params.id });
     res.status(200).json({ message: "Livre et image supprimés !" });
-  } catch (error) {
-    res.status(500).json({ error });
-  }
-};
-
-exports.getBestBook = async (req, res) => {
-  try {
-    const books = await Book.find().sort({ averageRating: -1 }).limit(3);
-    res.status(200).json(books);
   } catch (error) {
     res.status(500).json({ error });
   }
@@ -116,6 +117,15 @@ exports.getAllBooks = async (req, res) => {
     res.status(200).json(books);
   } catch (error) {
     res.status(400).json({ error });
+  }
+};
+
+exports.getBestBook = async (req, res) => {
+  try {
+    const books = await Book.find().sort({ averageRating: -1 }).limit(3);
+    res.status(200).json(books);
+  } catch (error) {
+    res.status(500).json({ error });
   }
 };
 

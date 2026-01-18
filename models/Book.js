@@ -1,7 +1,6 @@
 const mongoose = require("mongoose");
 const uniqueValidator = require('mongoose-unique-validator');
 
-// Création du model Sauce pour un stockage dans la bdd
 const bookSchema = mongoose.Schema({
   userId: { type: String, required: true },
   title: { type: String, required: true, unique: true },
@@ -21,5 +20,4 @@ const bookSchema = mongoose.Schema({
 
 bookSchema.plugin(uniqueValidator);
 
-// Export mongoose
 module.exports = mongoose.model("Book", bookSchema);
