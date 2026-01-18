@@ -19,16 +19,16 @@ const deleteImageCloudinary = async (publicId) => {
 
 exports.createBook = async (req, res) => {
   try {
-    const bookObject = JSON.parse(req.body.book);
+    const bookData = JSON.parse(req.body.book);
 
     const book = new Book({
-      ...bookObject,
+      ...bookData,
       userId: req.auth.userId,
-      ratings: bookObject.ratings || [],
-      averageRating: calcAverageRating(bookObject.ratings),
+      ratings: bookData.ratings || [],
+      averageRating: calcAverageRating(bookData.ratings),
+      imageUrl: "",
+      imageId: "",
     });
-
-    await book.save();
 
     if (req.file) {
       const result = await cloudinary.uploader.upload(req.file.path, {
@@ -40,12 +40,13 @@ exports.createBook = async (req, res) => {
 
       book.imageUrl = result.secure_url;
       book.imageId = result.public_id;
-      await book.save();
     }
 
+    await book.save();
     res.status(201).json({ message: "Livre enregistré !", book });
   } catch (error) {
-    res.status(400).json({ error });
+    console.error(error);
+    res.status(400).json({ error: error.message });
   }
 };
 
@@ -56,14 +57,10 @@ exports.modifyBook = async (req, res) => {
     if (book.userId !== req.auth.userId)
       return res.status(403).json({ message: "Non autorisé" });
 
-    const bookObject = req.file
-      ? { ...JSON.parse(req.body.book) }
-      : { ...req.body };
+    const bookData = req.file ? JSON.parse(req.body.book) : req.body;
 
     if (req.file) {
-      if (book.imageId) {
-        await deleteImageCloudinary(book.imageId);
-      }
+      if (book.imageId) await deleteImageCloudinary(book.imageId);
 
       const result = await cloudinary.uploader.upload(req.file.path, {
         folder: "books",
@@ -72,14 +69,17 @@ exports.modifyBook = async (req, res) => {
         transformation: [{ width: 400, height: 500, crop: "fill" }],
       });
 
-      bookObject.imageUrl = result.secure_url;
-      bookObject.imageId = result.public_id;
+      bookData.imageUrl = result.secure_url;
+      bookData.imageId = result.public_id;
     }
 
-    await Book.updateOne({ _id: req.params.id }, bookObject);
-    res.status(200).json({ message: "Livre modifié !", book: bookObject });
+    const updatedBook = await Book.findByIdAndUpdate(req.params.id, bookData, {
+      new: true,
+    });
+    res.status(200).json({ message: "Livre modifié !", book: updatedBook });
   } catch (error) {
-    res.status(400).json({ error });
+    console.error(error);
+    res.status(400).json({ error: error.message });
   }
 };
 
