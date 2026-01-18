@@ -1,41 +1,24 @@
 const Book = require("../models/Book");
-const fs = require("fs").promises;
 
 const calcAverageRating = (ratings) => {
   if (!ratings || ratings.length === 0) return 0;
   const sum = ratings.reduce((total, r) => total + r.grade, 0);
-  return parseFloat((sum / ratings.length).toFixed(2));
-};
-
-const deleteImage = async (imageUrl) => {
-  if (!imageUrl) return;
-  const filename = imageUrl.split("/images/")[1];
-  if (!filename) return;
-
-  try {
-    await fs.unlink(`images/${filename}`);
-  } catch (err) {
-    console.error("Erreur suppression image:", err.message);
-  }
+  return Number((sum / ratings.length).toFixed(2));
 };
 
 exports.createBook = async (req, res) => {
   try {
     const bookObject = JSON.parse(req.body.book);
-    delete bookObject._id;
-    delete bookObject._userId;
-
-    const initialRating = bookObject.ratings?.[0]?.grade || 0;
 
     const book = new Book({
       ...bookObject,
       userId: req.auth.userId,
-      imageUrl: `${req.protocol}://${req.get("host")}/images/${req.file.filename}`,
-      averageRating: initialRating,
+      imageUrl: req.file.path,
+      averageRating: bookObject.ratings?.[0]?.grade || 0,
     });
 
     await book.save();
-    res.status(201).json({ message: "Livre enregistré!" });
+    res.status(201).json({ message: "Livre enregistré !" });
   } catch (error) {
     res.status(400).json({ error });
   }
@@ -44,27 +27,18 @@ exports.createBook = async (req, res) => {
 exports.modifyBook = async (req, res) => {
   try {
     const bookObject = req.file
-      ? {
-          ...JSON.parse(req.body.book),
-          imageUrl: `${req.protocol}://${req.get("host")}/images/${req.file.filename}`,
-        }
+      ? { ...JSON.parse(req.body.book), imageUrl: req.file.path }
       : { ...req.body };
-    delete bookObject._userId;
 
-    const book = await Book.findOne({ _id: req.params.id });
+    const book = await Book.findById(req.params.id);
     if (!book) return res.status(404).json({ message: "Livre non trouvé" });
 
-    if (book.userId.toString() !== req.auth.userId) {
-      return res.status(403).json({ message: "403: unauthorized request" });
+    if (book.userId !== req.auth.userId) {
+      return res.status(403).json({ message: "Non autorisé" });
     }
 
-    if (req.file) await deleteImage(book.imageUrl);
-
-    await Book.updateOne(
-      { _id: req.params.id },
-      { ...bookObject, _id: req.params.id },
-    );
-    res.status(200).json({ message: "Livre modifié!" });
+    await Book.updateOne({ _id: req.params.id }, bookObject);
+    res.status(200).json({ message: "Livre modifié !" });
   } catch (error) {
     res.status(400).json({ error });
   }
@@ -72,17 +46,15 @@ exports.modifyBook = async (req, res) => {
 
 exports.deleteBook = async (req, res) => {
   try {
-    const book = await Book.findOne({ _id: req.params.id });
+    const book = await Book.findById(req.params.id);
     if (!book) return res.status(404).json({ message: "Livre non trouvé" });
 
-    if (book.userId.toString() !== req.auth.userId) {
-      return res.status(403).json({ message: "403: unauthorized request" });
+    if (book.userId !== req.auth.userId) {
+      return res.status(403).json({ message: "Non autorisé" });
     }
 
-    await deleteImage(book.imageUrl);
     await Book.deleteOne({ _id: req.params.id });
-
-    res.status(200).json({ message: "Livre supprimé!" });
+    res.status(200).json({ message: "Livre supprimé !" });
   } catch (error) {
     res.status(500).json({ error });
   }
@@ -99,7 +71,7 @@ exports.getBestBook = async (req, res) => {
 
 exports.getOneBook = async (req, res) => {
   try {
-    const book = await Book.findOne({ _id: req.params.id });
+    const book = await Book.findById(req.params.id);
     if (!book) return res.status(404).json({ message: "Livre non trouvé" });
     res.status(200).json(book);
   } catch (error) {
@@ -118,30 +90,29 @@ exports.getAllBooks = async (req, res) => {
 
 exports.rateBook = async (req, res) => {
   try {
-    const userId = req.body.userId;
-    if (userId !== req.auth.userId) {
+    if (req.body.userId !== req.auth.userId) {
       return res.status(401).json({ message: "Non autorisé" });
     }
 
-    const book = await Book.findOne({ _id: req.params.id });
+    const book = await Book.findById(req.params.id);
     if (!book) return res.status(404).json({ message: "Livre non trouvé" });
 
-    const existingRatingIndex = book.ratings.findIndex(
-      (r) => r.userId === userId,
+    const existingRating = book.ratings.find(
+      (r) => r.userId === req.auth.userId,
     );
 
-    if (existingRatingIndex !== -1) {
-      book.ratings[existingRatingIndex].grade = req.body.rating;
+    if (existingRating) {
+      existingRating.grade = req.body.rating;
     } else {
       book.ratings.push({
-        userId,
+        userId: req.auth.userId,
         grade: req.body.rating,
       });
     }
 
     book.averageRating = calcAverageRating(book.ratings);
-
     await book.save();
+
     res.status(201).json(book);
   } catch (error) {
     res.status(500).json({ error });
