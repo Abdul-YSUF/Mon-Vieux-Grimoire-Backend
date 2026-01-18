@@ -10,11 +10,12 @@ cloudinary.config({
 });
 
 const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
+  cloudinary,
   params: async (req, file) => {
-    let publicId = "temp_" + Date.now();
+    let publicId = `book_${Date.now()}`;
+
     if (req.params.id) {
-      publicId = `books/book_${req.params.id}`;
+      publicId = `book_${req.params.id}`;
     }
 
     return {

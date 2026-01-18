@@ -26,26 +26,13 @@ exports.createBook = async (req, res) => {
       userId: req.auth.userId,
       ratings: bookData.ratings || [],
       averageRating: calcAverageRating(bookData.ratings),
-      imageUrl: "",
-      imageId: "",
+      imageUrl: req.file ? req.file.path : "",
+      imageId: req.file ? req.file.filename : "",
     });
-
-    if (req.file) {
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: "books",
-        public_id: `book_${book._id}`,
-        overwrite: true,
-        transformation: [{ width: 400, height: 500, crop: "fill" }],
-      });
-
-      book.imageUrl = result.secure_url;
-      book.imageId = result.public_id;
-    }
 
     await book.save();
     res.status(201).json({ message: "Livre enregistré !", book });
   } catch (error) {
-    console.error(error);
     res.status(400).json({ error: error.message });
   }
 };
@@ -60,25 +47,20 @@ exports.modifyBook = async (req, res) => {
     const bookData = req.file ? JSON.parse(req.body.book) : req.body;
 
     if (req.file) {
-      if (book.imageId) await deleteImageCloudinary(book.imageId);
+      if (book.imageId) {
+        await cloudinary.uploader.destroy(book.imageId);
+      }
 
-      const result = await cloudinary.uploader.upload(req.file.path, {
-        folder: "books",
-        public_id: `book_${book._id}`,
-        overwrite: true,
-        transformation: [{ width: 400, height: 500, crop: "fill" }],
-      });
-
-      bookData.imageUrl = result.secure_url;
-      bookData.imageId = result.public_id;
+      bookData.imageUrl = req.file.path;
+      bookData.imageId = req.file.filename;
     }
 
     const updatedBook = await Book.findByIdAndUpdate(req.params.id, bookData, {
       new: true,
     });
+
     res.status(200).json({ message: "Livre modifié !", book: updatedBook });
   } catch (error) {
-    console.error(error);
     res.status(400).json({ error: error.message });
   }
 };
@@ -91,7 +73,7 @@ exports.deleteBook = async (req, res) => {
       return res.status(403).json({ message: "Non autorisé" });
 
     if (book.imageId) {
-      await deleteImageCloudinary(book.imageId);
+      await cloudinary.uploader.destroy(book.imageId);
     }
 
     await Book.deleteOne({ _id: req.params.id });
