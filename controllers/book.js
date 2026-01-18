@@ -24,42 +24,6 @@ exports.createBook = async (req, res) => {
   }
 };
 
-exports.modifyBook = async (req, res) => {
-  try {
-    const bookObject = req.file
-      ? { ...JSON.parse(req.body.book), imageUrl: req.file.path }
-      : { ...req.body };
-
-    const book = await Book.findById(req.params.id);
-    if (!book) return res.status(404).json({ message: "Livre non trouvé" });
-
-    if (book.userId !== req.auth.userId) {
-      return res.status(403).json({ message: "Non autorisé" });
-    }
-
-    await Book.updateOne({ _id: req.params.id }, bookObject);
-    res.status(200).json({ message: "Livre modifié !" });
-  } catch (error) {
-    res.status(400).json({ error });
-  }
-};
-
-exports.deleteBook = async (req, res) => {
-  try {
-    const book = await Book.findById(req.params.id);
-    if (!book) return res.status(404).json({ message: "Livre non trouvé" });
-
-    if (book.userId !== req.auth.userId) {
-      return res.status(403).json({ message: "Non autorisé" });
-    }
-
-    await Book.deleteOne({ _id: req.params.id });
-    res.status(200).json({ message: "Livre supprimé !" });
-  } catch (error) {
-    res.status(500).json({ error });
-  }
-};
-
 exports.getBestBook = async (req, res) => {
   try {
     const books = await Book.find().sort({ averageRating: -1 }).limit(3);
